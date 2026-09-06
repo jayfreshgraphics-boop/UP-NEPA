@@ -57,40 +57,63 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const deviceRef = db.collection("devices").doc("demo-device");
+    const outagesRef = deviceRef.collection("outages");
 
-    db.collection("devices").doc("demo-device")
-      .onSnapshot((doc) => {
-        const data = doc.data();
-        const card = document.getElementById("status-card");
-        const title = document.getElementById("status-title");
-        const sub = document.getElementById("status-sub");
-        if (!data) return;
-        if (data.isPowerOn) {
-          card.className = "on";
-          title.textContent = "Up NEPA!";
-          sub.textContent = data.label + " - Power is ON";
+    let previousIsPowerOn = null;
+
+    deviceRef.onSnapshot((doc) => {
+      const data = doc.data();
+      const card = document.getElementById("status-card");
+      const title = document.getElementById("status-title");
+      const sub = document.getElementById("status-sub");
+      if (!data) return;
+
+      if (data.isPowerOn) {
+        card.className = "on";
+        title.textContent = "Up NEPA!";
+        sub.textContent = data.label + " - Power is ON";
+      } else {
+        card.className = "off";
+        title.textContent = "NEPA Don Go";
+        sub.textContent = data.label + " - Power is OFF";
+      }
+
+      // Detect transition and log outage
+      if (previousIsPowerOn !== null && previousIsPowerOn !== data.isPowerOn) {
+        const now = new Date().toISOString();
+        if (data.isPowerOn === false) {
+          // Power just went OFF - start a new outage record
+          outagesRef.add({ startTime: now, endTime: null });
         } else {
-          card.className = "off";
-          title.textContent = "NEPA Don Go";
-          sub.textContent = data.label + " - Power is OFF";
+          // Power just came back ON - close the most recent open outage
+          outagesRef.where("endTime", "==", null)
+            .orderBy("startTime", "desc")
+            .limit(1)
+            .get()
+            .then((snapshot) => {
+              if (!snapshot.empty) {
+                snapshot.docs[0].ref.update({ endTime: now });
+              }
+            });
         }
-      });
+      }
+      previousIsPowerOn = data.isPowerOn;
+    });
 
     function formatDuration(startStr, endStr) {
       const start = new Date(startStr);
-      const end = new Date(endStr);
+      const end = endStr ? new Date(endStr) : new Date();
       const mins = Math.round((end - start) / 60000);
       if (mins < 60) return mins + "m";
       return Math.floor(mins / 60) + "h " + (mins % 60) + "m";
     }
 
     function formatTime(dateStr) {
-      const d = new Date(dateStr);
-      return d.toLocaleString();
+      return new Date(dateStr).toLocaleString();
     }
 
-    db.collection("devices").doc("demo-device").collection("outages")
-      .orderBy("startTime", "desc")
+    outagesRef.orderBy("startTime", "desc")
       .onSnapshot((snapshot) => {
         const list = document.getElementById("history-list");
         if (snapshot.empty) {
@@ -103,7 +126,8 @@
           const div = document.createElement("div");
           div.className = "outage-item";
           div.innerHTML =
-            '<span class="duration">' + formatDuration(o.startTime, o.endTime) + '</span>' +
+            '<span class="duration">' + formatDuration(o.startTime, o.endTime) +
+            (o.endTime ? '' : ' (ongoing)') + '</span>' +
             '<div class="time">' + formatTime(o.startTime) + '</div>';
           list.appendChild(div);
         });
