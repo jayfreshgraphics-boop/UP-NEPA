@@ -1,19 +1,17 @@
-type
 <!DOCTYPE html>
 <html>
 <head>
   <title>Up NEPA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; }
+    body { font-family: sans-serif; text-align: center; margin: 0; padding: 0; color: black; }
     #status-card {
       margin-top: 80px;
       padding: 40px 20px;
-      color: white;
       transition: background-color 0.3s;
     }
-    #status-card.on { background-color: #1EB980; }
-    #status-card.off { background-color: #E0453D; }
+    #status-card.on { background-color: #1EB980; color: white; }
+    #status-card.off { background-color: #E0453D; color: white; }
     h1 { font-size: 32px; margin: 10px 0; }
     p { font-size: 16px; opacity: 0.9; }
   </style>
@@ -35,26 +33,41 @@ type
       messagingSenderId: "107171702742",
       appId: "1:107171702742:web:d47d1bf85ed4af1dece677"
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
 
-    db.collection("devices").doc("demo-device")
-      .onSnapshot((doc) => {
-        const data = doc.data();
-        const card = document.getElementById("status-card");
-        const title = document.getElementById("status-title");
-        const sub = document.getElementById("status-sub");
+    try {
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
 
-        if (data.isPowerOn) {
-          card.className = "on";
-          title.textContent = "⚡ Up NEPA!";
-          sub.textContent = data.label + " — Power is ON";
-        } else {
-          card.className = "off";
-          title.textContent = "🔌 NEPA Don Go";
-          sub.textContent = data.label + " — Power is OFF";
-        }
-      });
+      db.collection("devices").doc("demo-device")
+        .onSnapshot((doc) => {
+          const data = doc.data();
+          const card = document.getElementById("status-card");
+          const title = document.getElementById("status-title");
+          const sub = document.getElementById("status-sub");
+
+          if (!data) {
+            title.textContent = "No data found";
+            sub.textContent = "Check that demo-device exists in Firestore";
+            return;
+          }
+
+          if (data.isPowerOn) {
+            card.className = "on";
+            title.textContent = "Up NEPA!";
+            sub.textContent = data.label + " - Power is ON";
+          } else {
+            card.className = "off";
+            title.textContent = "NEPA Don Go";
+            sub.textContent = data.label + " - Power is OFF";
+          }
+        }, (error) => {
+          document.getElementById("status-title").textContent = "Connection error";
+          document.getElementById("status-sub").textContent = error.message;
+        });
+    } catch (e) {
+      document.getElementById("status-title").textContent = "Setup error";
+      document.getElementById("status-sub").textContent = e.message;
+    }
   </script>
 </body>
 </html>
