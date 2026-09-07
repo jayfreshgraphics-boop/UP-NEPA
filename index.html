@@ -58,9 +58,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const deviceRef = db.collection("devices").doc("demo-device");
-    const outagesRef = deviceRef.collection("outages");
-
-    let previousIsPowerOn = null;
 
     deviceRef.onSnapshot((doc) => {
       const data = doc.data();
@@ -78,27 +75,6 @@
         title.textContent = "NEPA Don Go";
         sub.textContent = data.label + " - Power is OFF";
       }
-
-      // Detect transition and log outage
-      if (previousIsPowerOn !== null && previousIsPowerOn !== data.isPowerOn) {
-        const now = new Date().toISOString();
-        if (data.isPowerOn === false) {
-          // Power just went OFF - start a new outage record
-          outagesRef.add({ startTime: now, endTime: null });
-        } else {
-          // Power just came back ON - close the most recent open outage
-          outagesRef.where("endTime", "==", null)
-            .orderBy("startTime", "desc")
-            .limit(1)
-            .get()
-            .then((snapshot) => {
-              if (!snapshot.empty) {
-                snapshot.docs[0].ref.update({ endTime: now });
-              }
-            });
-        }
-      }
-      previousIsPowerOn = data.isPowerOn;
     });
 
     function formatDuration(startStr, endStr) {
@@ -113,7 +89,7 @@
       return new Date(dateStr).toLocaleString();
     }
 
-    outagesRef.orderBy("startTime", "desc")
+    deviceRef.collection("outages").orderBy("startTime", "desc")
       .onSnapshot((snapshot) => {
         const list = document.getElementById("history-list");
         if (snapshot.empty) {
